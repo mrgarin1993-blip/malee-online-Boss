@@ -693,11 +693,11 @@ function openCustomerPage(type) {
 }
 
 // ==========================================
-// 📌 จุดที่ต้องแก้: โค้ดบันทึกสินค้า (ตัวใหม่! ส่งรูปไป ImgBB แก้ปัญหาติดบล็อก 100%)
+// 📌 ฟังก์ชันบันทึก/แก้ไขสินค้า (ระบบฝากรูป ImgBB สมบูรณ์ 100%)
 // ==========================================
 async function saveProduct(pid, catName) {
     const btn = document.getElementById(`btn-${pid}`);
-    const nameInput = document.getElementById(`name-${pid}`).value;
+    const nameInput = document.getElementById(`name-${pid}`).value.trim();
     const priceInput = document.getElementById(`price-${pid}`).value;
     const wholesaleInput = document.getElementById(`wholesale-${pid}`).value;
     
@@ -721,6 +721,7 @@ async function saveProduct(pid, catName) {
     try {
         let imageUrl = "";
 
+        // 🟢 โซนอัปโหลดรูปขึ้น ImgBB (ของแท้ของมึง)
         if (fileInput) {
             btn.innerText = "กำลังอัปรูปรอแป๊บ...";
             const formData = new FormData();
@@ -755,34 +756,38 @@ async function saveProduct(pid, catName) {
 
         btn.innerText = "กำลังจัดเก็บข้อมูล...";
 
+        // 🟢 โซนจัดเตรียมข้อมูล (ระบบจะส่ง catName ชื่อใหม่ล่าสุดไปทับของเก่าที่นี่แหละ!)
         let productData = {
             name: nameInput,
             price: parseFloat(priceInput) || 0,
             vipPrice: parseFloat(wholesaleInput) || 0,
-            category: catName,
+            category: catName, // <-- ดึงชื่อภาษาไทยจากปุ่มหน้าเว็บมาใช้เลย
             isSelling: isSelling,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
+        // ถ้ารูปมีการอัปเดตใหม่ ค่อยส่งลิงก์รูปไปทับ
         if (imageUrl !== "") {
             productData.imageUrl = imageUrl;
         }
 
+        // ยิงข้อมูลขึ้น Firebase (merge: true คืออัปเดตเฉพาะค่าที่ส่งไป ค่าอื่นไม่หาย)
         await db.collection("products").doc(pid).set(productData, { merge: true });
 
-        // 🔥 [แก้ตรงนี้!] สั่งบันทึกประวัติแบบละเอียดโชว์ข้อมูลที่อัปเดต และมัดรวมรหัสไปเพื่อใช้วาร์ป
+        // 🔥 สั่งบันทึกประวัติแบบละเอียด โชว์ข้อมูลที่อัปเดต และมัดรวมรหัสไปเพื่อใช้วาร์ป
         if (typeof logAction === 'function') {
             logAction(
                 'บันทึก/แก้ไขสินค้า', 
                 `อัปเดต "${nameInput}" -> สถานะ: ${isSelling ? 'เปิดขาย' : 'ปิดซ่อน'} | ราคาปกติ: ${priceInput}฿ | ราคาส่ง: ${wholesaleInput}฿`, 
                 'product', 
-                `${catName}|${pid}` // มัดรวมชื่อหมวดหมู่กับรหัสสินค้าส่งไป
+                `${catName}|${pid}`
             );
         }
 
         btn.innerText = "บันทึกสำเร็จ ✅";
         btn.style.background = "#28a745";
         
+        // คืนสภาพปุ่มกลับมาเหมือนเดิม
         setTimeout(() => {
             btn.innerText = "บันทึก";
             btn.style.background = "#16365d";
@@ -798,10 +803,8 @@ async function saveProduct(pid, catName) {
     }
 }
 
-
-
 // ==========================================
-// 📌 ฟังก์ชันดึงข้อมูลที่เคยบันทึกไว้ มาแสดงในช่องบล็อกกล่องสินค้าหลังบ้าน (อัปเดต: เพิ่ม loading="lazy" ให้หลังบ้านโหลดรูปลื่นๆ ตามหน้าจอ)
+// 📌 ฟังก์ชันดึงข้อมูลสินค้าหลังบ้าน (โหลดเร็ว โหลดชัวร์)
 // ==========================================
 async function loadAdminProducts() {
     try {
@@ -819,14 +822,14 @@ async function loadAdminProducts() {
             const statusInput = document.getElementById(`status-${pid}`);
             const previewContainer = document.getElementById(`preview-${pid}`); 
 
-            // ถ้าหาช่อง input เจอ ถึงจะเอาข้อมูลไปใส่
+            // ถ้าเจอช่องของ ID นี้บนหน้าจอ ค่อยเอาข้อมูลไปยัดใส่ (โคตรฉลาด!)
             if (nameInput) {
                 nameInput.value = data.name || "";
                 if (priceInput) priceInput.value = data.price || "";
                 if (wholesaleInput) wholesaleInput.value = data.vipPrice || "";
                 if (statusInput) statusInput.checked = (data.isSelling !== false);
                 
-                // 🔥 [จุดที่แก้ไขปรับปรุงเฉพาะจุด] สั่งดึงรูปมาโชว์ พร้อมใส่ loading="lazy" เพื่อให้เบราว์เซอร์โหลดรูปเฉพาะกล่องที่มึงเลื่อนจอลงมาดู
+                // ระบบโหลดรูป (มี Lazy Load ช่วยให้เว็บไม่ค้างตอนโหลดเยอะๆ)
                 let finalImg = data.imageUrl || data.img;
                 if (previewContainer && finalImg && finalImg !== "📦") {
                     previewContainer.innerHTML = `<img src="${finalImg}" loading="lazy" style="width: 100%; height: 100%; object-fit: cover;">`;
@@ -834,7 +837,8 @@ async function loadAdminProducts() {
 
                 count++;
             } else {
-                console.log("❌ หาบล็อกไม่เจอสำหรับ ID: " + pid + " (อันนี้อาจจะเป็นข้อมูลเก่าที่ตกค้างใน Firebase)");
+                // ถ้าหาไม่เจอ แปลว่าไม่ได้เปิดหมวดหมู่นี้อยู่ ระบบจะข้ามไปเงียบๆ
+                console.log("ข้ามการโหลด ID: " + pid + " (ไม่ได้อยู่หน้าหมวดหมู่นี้ หรือเป็นของเก่า)");
             }
         });
         console.log(`✅ โหลดข้อมูลสำเร็จ! ใส่ลงไปทั้งหมด ${count} กล่อง`);
