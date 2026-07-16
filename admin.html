@@ -1,0 +1,502 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MaLee Online - Admin</title>
+    <link rel="stylesheet" href="admin.css">
+
+    <link rel="manifest" href="manifest-admin.json">
+    <link rel="apple-touch-icon" href="admin-icon-192.png">
+    <meta name="theme-color" content="#16365d">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MaLee Admin">
+    
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
+</head>
+<body>
+
+    <div id="login-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+        
+        <div style="background: white; width: 90%; max-width: 400px; padding: 40px 20px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; position: relative; overflow: hidden;">
+            
+            <div style="position: relative; z-index: 1;">
+                <h2 style="color: #16365d; margin-top: 0; margin-bottom: 25px; font-size: 1.5em;">🔐 เข้าสู่ระบบ</h2>
+                
+                <input type="text" id="login-username" placeholder="ชื่อผู้ดูแล" style="width: 100%; box-sizing: border-box; padding: 15px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 15px; font-size: 1.1em; text-align: center;">
+                
+                <input type="password" id="login-password" placeholder="รหัสผ่าน" style="width: 100%; box-sizing: border-box; padding: 15px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 25px; font-size: 1.1em; text-align: center; letter-spacing: 5px;">
+            </div>
+
+            <img src="1781421808113.png" alt="Logo BG" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70%; opacity: 0.15; z-index: 2; pointer-events: none;">
+
+            <button onclick="checkLogin()" style="position: relative; z-index: 3; width: 100%; background: #16365d; color: white; border: none; border-radius: 8px; padding: 15px; font-weight: bold; cursor: pointer; font-size: 1.2em; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">เข้าสู่ระบบหลังบ้าน</button>
+            
+        </div>
+    </div>
+    </div>
+
+    <div class="admin-container">
+        <div class="header">
+            <h1>MaLee</h1>
+            <h1>🔵 Online</h1>
+        </div>
+
+        <div class="search-bar">
+            <span>Store</span>
+            <span>🔍</span>
+        </div>
+        <div class="stats-container">
+            <div class="stat-box">
+                Daily Revenue
+                <p>$4.00</p>
+            </div>
+            <div class="stat-box">
+                Weekly Revenue
+                <p>$7.4.00</p>
+            </div>
+            <div class="stat-box">
+                Monthly
+                <p>$$.330</p>
+            </div>
+        </div>
+
+        <div class="menu-wrapper">
+            <div class="menu-grid">
+                
+                <div class="menu-item" onclick="clickMenu('store')">
+                    <div class="icon-box">💈</div>
+                    <span>หน้าร้าน</span>
+                </div>
+
+                <div class="menu-item" onclick="clickMenu('bills')">
+                    <div class="icon-box" style="position: relative;">
+                        📋
+                        <span id="main-bill-badge" style="display: none; position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; justify-content: center; align-items: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">0</span>
+                    </div>
+                    <span>บิลสินค้า</span>
+                </div>
+
+                <div class="menu-item" onclick="clickMenu('shipping')">
+                    <div class="icon-box" style="position: relative;">
+                        🚚
+                        <span id="main-shipping-menu-badge" style="display: none; position: absolute; top: -8px; right: -8px; background: red; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; justify-content: center; align-items: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">0</span>
+                    </div>
+                    <span>รอส่ง</span>
+                </div>
+
+                <div class="menu-item" onclick="clickMenu('vip')">
+                    <div class="icon-box">🔐</div>
+                    <span>รหัส</span>
+                </div>
+
+                <div class="menu-item" onclick="clickMenu('customers')">
+                    <div class="icon-box">👥</div>
+                    <span>จัดการ ลค.</span>
+                </div>
+                
+                <div class="menu-item" onclick="clickMenu('logout')">
+                    <div class="icon-box">🔌</div>
+                    <span>ออกจากระบบ</span>
+                </div>
+            </div> </div><!-- ========================================== -->
+        <!-- ส่วนของหน้าย่อย: เมนูหน้าร้าน -->
+        <!-- ========================================== -->
+        <div id="store-submenu-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">จัดการหน้าร้าน</h2>
+            
+            <button class="submenu-btn" onclick="openCategoryPage()">
+                <span class="icon">🛠️</span> 1. แก้ไขหน้าร้าน
+            </button>
+        </div>
+
+<!-- ========================================== -->
+        <!-- 📌 โหมด: 1. แก้ไขหน้าร้าน (8 หมวดหมู่ มีสวิตช์) -->
+        <!-- ========================================== -->
+        <div id="category-management-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">หมวดหมู่สินค้า</h2>
+            <div class="category-list">
+                
+                <!-- แถบที่ 1 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('ของใช้ไหว้เช็งเม้ง')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">🧧 ของใช้ไหว้เช็งเม้ง</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'ของใช้ไหว้เช็งเม้ง')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 2 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('น้ำอัดลม น้ำผึ้ง เส้นหมี่')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">🌿 น้ำอัดลม น้ำผึ้ง เส้นหมี่</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'น้ำอัดลม น้ำผึ้ง เส้นหมี่')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 3 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('ยาสมุนไพรปรุงอาหาร')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">🗡️ ยาสมุนไพรปรุงอาหาร</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'ยาสมุนไพรปรุงอาหาร')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 4 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('มีด จอบ เคียว ตะปู')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">📦 มีด จอบ เคียว ตะปู</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'มีด จอบ เคียว ตะปู')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 5 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('รองเท้าบูท สตั๊ดดอย')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">📦 รองเท้าบูท สตั๊ดดอย</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'รองเท้าบูท สตั๊ดดอย')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 6 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('สายไฟ บั๊กไฟ หลอดไฟ')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">📦 สายไฟ บั๊กไฟ หลอดไฟ</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'สายไฟ บั๊กไฟ หลอดไฟ')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 7 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('เสื่อน้ำมัน ผ้าใบ เชือก')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">📦 เสื่อน้ำมัน ผ้าใบ เชือก</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'เสื่อน้ำมัน ผ้าใบ เชือก')"><span class="slider"></span></label>
+                </div>
+                <!-- แถบที่ 8 -->
+                <div class="category-bar">
+                    <div onclick="openProductPage('รวมของใช้อื่น ๆ')" style="cursor: pointer; flex-grow: 1;">
+                        <span class="cat-name">📦 รวมของใช้อื่น ๆ</span>
+                        <span style="font-size: 0.8em; color: #7ba2cc; display: block;">(กดเพื่อจัดการสินค้า)</span>
+                    </div>
+                    <label class="switch"><input type="checkbox" checked onclick="return confirmToggle(this, 'รวมของใช้อื่น ๆ')"><span class="slider"></span></label>
+                </div>
+
+            </div>
+        </div>
+        
+        <!-- ========================================== -->
+        <!-- 📌 โหมด: 3. หน้าจัดการสินค้าย่อย (JS จะเสกสินค้ามาใส่ที่นี่ แทน Iframe อันเก่า) -->
+        <!-- ========================================== -->
+<div id="products-page" style="display: none; padding: 10px; width: 100%; box-sizing: border-box; background-color: #f4f9f9; border-radius: 15px; overflow-x: hidden;">            <h2 id="products-title" style="color: #1a365d; text-align: center; margin-bottom: 20px;">สินค้า</h2>
+            <div id="grid-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;"></div>
+        </div>
+        
+        <!-- ... (นี่คือตอนจบของโค้ดหน้าสินค้าย่อยของเดิม) ... -->
+      
+
+      <!-- ========================================== -->
+        <!-- 📌 หน้าเมนูบิลสินค้า (แก้สีพื้นหลังให้โปร่งใส กลืนกับแอป) -->
+        <!-- ========================================== -->
+        <div id="bills-submenu-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">📋 จัดการบิลสินค้า</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <!-- 1. รอสรุปยอด -->
+                <button style="background: transparent; border: 2px solid #ffc107; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openBillPage('pending')">
+                    <span>📝 1. รอสรุปยอด</span>
+                    <span id="sub-pending-badge" style="background: #ffc107; color: #000; border-radius: 50%; width: 25px; height: 25px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.8em;">0</span>
+                </button>
+
+                <!-- 2. ชำระแล้ว -->
+                <button style="background: transparent; border: 2px solid #28a745; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openBillPage('paid')">
+                    <span>✅ 2. ชำระแล้ว</span>
+                    <span id="sub-paid-badge" style="background: #28a745; color: #fff; border-radius: 50%; width: 25px; height: 25px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.8em;">0</span>
+                </button>
+                
+                <!-- 3. ยกเลิกบิล -->
+                <button style="background: transparent; border: 2px solid #dc3545; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openBillPage('canceled')">
+                    <span>❌ 3. ยกเลิกบิล</span>
+                    <span id="sub-canceled-badge" style="background: #dc3545; color: #fff; border-radius: 50%; width: 25px; height: 25px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.8em;">0</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 📌 หน้าย่อยของบิลสินค้าทั้ง 3 หน้า -->
+        <!-- ========================================== -->
+        
+        <!-- 1. หน้าบิลรอสรุปยอด -->
+<div id="bill-pending-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #ffc107; text-align: center; margin-bottom: 20px;">📝 รอสรุปยอด</h2>
+            
+            <div id="pending-bills-container">
+                <div style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #ffc107;">
+                    [ กำลังโหลดข้อมูล... ]
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- 2. หน้าบิลชำระแล้ว -->
+<div id="bill-paid-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #28a745; text-align: center; margin-bottom: 20px;">✅ ชำระแล้ว</h2>
+            <div id="paid-bills-container" style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #28a745;">
+                [ รอข้อมูลบิลที่ลูกค้าโอนเงินแล้วมาโชว์ที่นี่ ]
+            </div>
+        </div>
+
+        <!-- 3. หน้าบิลยกเลิก -->
+        <div id="bill-canceled-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #dc3545; text-align: center; margin-bottom: 20px;">❌ ยกเลิกบิล</h2>
+            <div id="canceled-bills-container"></div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 📌 หน้าเมนูการจัดส่ง (2 หัวข้อ) -->
+        <!-- ========================================== -->
+        <div id="shipping-submenu-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">🚚 จัดการการจัดส่ง</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button style="background: transparent; border: 2px solid #fd7e14; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openShippingPage('pending')">
+                    <span>📦 1. สินค้ารอส่ง</span>
+                    <span id="shipping-pending-badge" style="background: #fd7e14; color: #fff; border-radius: 50%; width: 25px; height: 25px; display: inline-flex; justify-content: center; align-items: center; font-size: 0.8em;">0</span>
+                </button>
+                
+                <button style="background: transparent; border: 2px solid #6c757d; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openShippingPage('history')">
+                    <span>🕒 2. ประวัติการส่งสินค้า</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="shipping-pending-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #fd7e14; text-align: center; margin-bottom: 20px;">📦 สินค้ารอส่ง</h2>
+            <div id="shipping-pending-container">
+                <div style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #fd7e14;">
+                    กำลังโหลดข้อมูลสินค้ารอจัดส่ง... ⏳
+                </div>
+            </div>
+        </div>
+
+        <div id="shipping-history-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #6c757d; text-align: center; margin-bottom: 20px;">🕒 ประวัติการส่งสินค้า</h2>
+            <div id="shipping-history-container">
+                <div style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #6c757d;">
+                    กำลังโหลดประวัติการจัดส่ง... ⏳
+                </div>
+            </div>
+        </div>
+        
+        <!-- ========================================== -->
+        <!-- 📌 หน้า 4. รหัสแอป & ความปลอดภัย (รหัสแอป / รหัส VIP / ผู้ดูแล) -->
+        <!-- ========================================== -->
+<div id="security-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">🔒 ความปลอดภัย & VIP</h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                
+                <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #16365d;">
+                    <h3 style="color: #16365d; margin-top: 0; font-size: 1.1em; margin-bottom: 10px;">📱 ตั้งรหัสเข้าแอป (App PIN)</h3>
+                    <p style="font-size: 0.8em; color: #7ba2cc; margin-bottom: 15px;">รหัส 4-6 หลัก สำหรับแอดมินใช้เข้าสู่ระบบ</p>
+                    <input type="password" id="app-pin-input" placeholder="****" style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 15px; text-align: center; font-size: 1.5em; letter-spacing: 10px;">
+                    <button onclick="saveAppPin()" style="width: 100%; background: #16365d; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; font-size: 1em;">บันทึกรหัสแอป</button>
+                </div>
+
+                <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #fd7e14;">
+                    <h3 style="color: #fd7e14; margin-top: 0; font-size: 1.1em; margin-bottom: 10px;">👑 รหัสลับเปลี่ยนสินค้าราคาส่ง</h3>
+                    <p style="font-size: 0.8em; color: #7ba2cc; margin-bottom: 15px;">ตั้งคำลับให้ลูกค้าพิมพ์เพื่อปลดล็อคราคาส่ง</p>
+                    <input type="text" id="vip-pin-input" placeholder="เช่น VIP999" style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 15px; text-align: center; font-size: 1.2em; letter-spacing: 2px;">
+                    <button onclick="saveVipPin()" style="width: 100%; background: #fd7e14; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; font-size: 1em;">บันทึกรหัส VIP</button>
+                </div>
+
+                <div style="background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #28a745; margin-top: 20px;">
+                    <h3 style="color: #28a745; margin-top: 0; font-size: 1.1em; margin-bottom: 10px;">👥 เพิ่มผู้ดูแลระบบ (Staff)</h3>
+                    <p style="font-size: 0.8em; color: #666; margin-bottom: 15px;">สร้างบัญชีและตั้งรหัสให้ลูกน้อง เพื่อบันทึกประวัติการทำงาน</p>
+                    
+                    <input type="text" id="new-admin-username" placeholder="ชื่อผู้ดูแล (เช่น น้องสาว)" style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 10px; font-size: 1em;">
+                    
+                    <input type="password" id="new-admin-password" placeholder="ตั้งรหัสผ่าน (4 ตัวขึ้นไป)" style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 15px; font-size: 1em;">
+                    
+                    <button onclick="addAdmin()" style="width: 100%; background: #28a745; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; font-size: 1em;">+ เพิ่มบัญชีผู้ดูแล</button>
+
+                    <ul id="admin-list" style="list-style: none; padding: 0; margin-top: 20px;">
+                    </ul>
+                </div>
+
+                <div id="action-log-section" style="display: none; background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #6f42c1; margin-top: 20px;">
+                    <h3 style="color: #6f42c1; margin-top: 0; font-size: 1.1em; margin-bottom: 10px;">📋 ประวัติการทำงาน (Action Log)</h3>
+                    <p style="font-size: 0.8em; color: #666; margin-bottom: 15px;">ตรวจสอบประวัติการแก้ไขข้อมูลทั้งหมดในระบบ</p>
+                    <button onclick="openActionLogPage()" style="width: 100%; background: #6f42c1; color: white; border: none; border-radius: 8px; padding: 12px; font-weight: bold; cursor: pointer; font-size: 1em; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">ดูประวัติการทำงาน</button>
+                </div>
+
+                </div>
+        </div>
+        
+                <div id="action-log-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+            <div style="display: flex; justify-content: center; margin-bottom: 25px; width: 100%;">
+                <h2 style="color: #6f42c1; margin: 0; text-align: center; font-family: 'Kanit', sans-serif;">📋 ประวัติการทำงาน</h2>
+            </div>
+            
+            <div id="action-log-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 75vh; overflow-y: auto; padding-right: 5px;">
+                </div>
+        </div>    
+
+
+        <!-- ========================================== -->
+        <!-- 📌 หน้า 5. จัดการลูกค้า (เมนูหลัก) -->
+        <!-- ========================================== -->
+<div id="customers-submenu-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+    <h2 style="color: #1a365d; text-align: center; margin-bottom: 20px;">👥 จัดการลูกค้า</h2>
+    
+    <div style="display: flex; flex-direction: column; gap: 15px;">
+        <button style="background: transparent; border: 2px solid #17a2b8; border-radius: 10px; padding: 15px; font-size: 1.1em; color: #16365d; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="openCustomerPage('all')">
+            <span>📋 1. ข้อมูลลูกค้ารวมทั้งหมด</span>
+        </button>
+    </div>
+</div>
+
+<div id="customers-all-page" style="display: none; padding: 20px; width: 100%; box-sizing: border-box;">
+    <h2 style="color: #17a2b8; text-align: center; margin-bottom: 15px;">📋 ลูกค้าทั้งหมด</h2>
+    
+    <input type="text" id="customer-search-input" oninput="filterCustomers()" placeholder="🔍 ค้นหาชื่อ หรือ เบอร์โทร..." style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 20px;">
+
+    <div id="customer-list-container" style="height: calc(100vh - 160px); overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 10px;">
+    </div>                
+</div>
+
+        
+        </div> </div> <button id="top-home-btn" onclick="backToMainMenu()" style="display: none; position: fixed; top: 15px; right: 20px; background: #16365d; color: white; border: 2px solid #7ba2cc; border-radius: 50%; width: 45px; height: 45px; font-size: 1.2em; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 9999;">
+        🏠
+    </button>
+
+    <div id="pwa-install-popup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 10000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; backdrop-filter: blur(3px);">
+        <div style="background: white; border-radius: 15px; padding: 25px 20px; width: 100%; max-width: 350px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative; animation: popIn 0.3s ease-out;">
+            <button onclick="closeInstallPopup()" style="position: absolute; top: 12px; right: 15px; background: none; border: none; font-size: 1.5em; color: #888; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+            
+            <img src="./admin-icon-192.png" alt="MaLee Admin" style="width: 75px; height: 75px; border-radius: 18px; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            
+            <h3 style="margin: 0 0 10px 0; color: #16365d; font-family: 'Kanit', sans-serif;">ติดตั้ง MaLee Admin</h3>
+            
+            <div id="pwa-popup-content" style="color: #555; font-size: 0.95em; margin-bottom: 20px; line-height: 1.6; font-family: 'Kanit', sans-serif;">
+                กำลังตรวจสอบระบบ...
+            </div>
+            
+            <button id="pwa-install-btn" style="display: none; width: 100%; padding: 12px; background: linear-gradient(180deg, #16365d 0%, #2e5a88 100%); color: white; border: none; border-radius: 8px; font-size: 1em; font-weight: bold; font-family: 'Kanit', sans-serif; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">ติดตั้งแอปพลิเคชัน</button>
+        </div>
+    </div>
+
+    <style>
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+    </style>
+
+    <script>
+        let deferredPrompt;
+        const installPopup = document.getElementById('pwa-install-popup');
+        const popupContent = document.getElementById('pwa-popup-content');
+        const installBtn = document.getElementById('pwa-install-btn');
+
+        // ฟังก์ชันตรวจจับระบบ iOS
+        const isIOS = () => {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        };
+
+        // ฟังก์ชันตรวจสอบว่า iOS นั้นติดตั้งแอปแล้วหรือยัง
+        const isIosInstalled = () => {
+            return window.navigator.standalone === true;
+        };
+
+        // เมื่อลูกค้ากดยกเลิก ให้ซ่อนและจำไว้ใน Session
+        function closeInstallPopup() {
+            installPopup.style.display = 'none';
+            sessionStorage.setItem('hideAdminInstallPopup', 'true');
+        }
+
+        // ==========================================
+        // ลอจิกสำหรับฝั่ง Android
+        // ==========================================
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+
+            if (!sessionStorage.getItem('hideAdminInstallPopup')) {
+                popupContent.innerHTML = 'ติดตั้งระบบหลังบ้านลงในมือถือ เพื่อจัดการร้านค้าได้ง่ายและรวดเร็วยิ่งขึ้น!';
+                installBtn.style.display = 'block'; 
+                installPopup.style.display = 'flex'; 
+            }
+        });
+
+        // เมื่อกดปุ่ม "ติดตั้งแอปพลิเคชัน" (Android)
+        installBtn.addEventListener('click', async () => {
+            installPopup.style.display = 'none'; 
+            if (deferredPrompt) {
+                deferredPrompt.prompt(); 
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('✅ ยอมรับการติดตั้งระบบหลังบ้านแล้ว');
+                    sessionStorage.setItem('hideAdminInstallPopup', 'true'); 
+                }
+                deferredPrompt = null;
+            }
+        });
+
+        // ==========================================
+        // ลอจิกสำหรับฝั่ง iPhone/iPad (iOS)
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            if (isIOS() && !isIosInstalled() && !sessionStorage.getItem('hideAdminInstallPopup')) {
+                popupContent.innerHTML = 'ติดตั้งแอปบน iPhone ของคุณง่ายๆ<br><br>1. กดปุ่ม <b>แชร์</b> <span style="font-size:1.2em;">(📤)</span> ด้านล่าง<br>2. เลื่อนเมนูและเลือก <b>"เพิ่มลงหน้าจอโฮม"</b><br><span style="font-size:1.2em;">(➕)</span>';
+                installBtn.style.display = 'none'; 
+                installPopup.style.display = 'flex'; 
+            }
+        });
+    </script>
+
+ <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+
+    <script>
+      // รหัส Config ของนาย (เอามาจากที่นายส่งให้เป๊ะๆ)
+      const firebaseConfig = {
+        apiKey: "AIzaSyBeINoG8WXEOtCF8kTpVD-tl4sbjKD9sgY",
+        authDomain: "malee-online-b0afe.firebaseapp.com",
+        projectId: "malee-online-b0afe",
+        storageBucket: "malee-online-b0afe.firebasestorage.app",
+        messagingSenderId: "167732521595",
+        appId: "1:167732521595:web:80c4c599e43a034d4310de",
+        measurementId: "G-V2ZDCRMRX9"
+      };
+      
+      // สั่งเปิดใช้งาน Firebase
+      if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+      }
+      const db = firebase.firestore();      // เตรียมใช้งานฐานข้อมูล (เก็บข้อความ)
+      const storage = firebase.storage();   // เตรียมใช้งานที่เก็บรูปภาพ (Storage)
+      
+      console.log("🔥 Firebase เชื่อมต่อสำเร็จแล้วเว้ยตี๋!");
+    </script>
+    <script src="admin.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <div id="admin-image-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 99999; justify-content: center; align-items: center; flex-direction: column;">
+        <span onclick="document.getElementById('admin-image-modal').style.display='none'" style="position: absolute; top: 20px; right: 30px; color: white; font-size: 40px; font-weight: bold; cursor: pointer;">&times;</span>
+        <img id="admin-modal-img" src="" style="max-width: 70%; max-height: 80%; border-radius: 10px; border: 3px solid #fff; box-shadow: 0 0 20px rgba(255,255,255,0.2);">
+        <p style="color: white; margin-top: 15px; font-size: 1.2em;">แตะที่กากบาทเพื่อปิด</p>
+    </div>
+
+</body>
+</html>
+
+
