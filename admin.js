@@ -1272,7 +1272,7 @@ function cancelBill(billId) {
 }
 
 // ==========================================
-// 📌 ฟังก์ชันโหลดข้อมูลบิล "ชำระแล้ว" (เวอร์ชันโครงสร้างหัวบิล 2 บรรทัด + เรียงลำดับบิล1อยู่ล่างสุด)
+// 📌 ฟังก์ชันโหลดข้อมูลบิล "ชำระแล้ว" (เวอร์ชันมีปฏิทินเลือกดูย้อนหลังได้)
 // ==========================================
 async function loadPaidBills() {
     const container = document.getElementById('paid-bills-container');
@@ -1281,51 +1281,62 @@ async function loadPaidBills() {
     container.innerHTML = '<p style="text-align:center; color:#5b7c9e;">กำลังโหลดข้อมูลบิลชำระแล้ว...</p>';
 
     try {
-        // วิ่งไปดึงบิลทั้งหมดที่สถานะเป็น "ชำระแล้ว"
         const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
         
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // 📅 จัดการวันที่จากปฏิทิน
+        const datePicker = document.getElementById('paid-date-picker');
+        let targetDate = new Date();
 
-        // 📦 1. เอาข้อมูลบิลของวันนี้มาเก็บใน "กล่องความจำ (Array)"
+        if (datePicker && datePicker.value) {
+            // ถ้ามีการเลือกวันที่จากปฏิทิน ให้ใช้วันนั้น
+            targetDate = new Date(datePicker.value);
+        } else if (datePicker) {
+            // เซ็ตค่าเริ่มต้นให้ปฏิทินโชว์ "วันนี้" ตอนเปิดหน้าครั้งแรก (ปรับให้ตรงกับเวลาไทย)
+            const localISOTime = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            datePicker.value = localISOTime;
+        }
+
+        // กำหนดขอบเขตเวลา เริ่มต้น 00:00:00 ถึง 23:59:59 ของวันที่เลือกเท่านั้น
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
         let paidOrders = [];
         snapshot.forEach(doc => {
             const order = doc.data();
             const updatedAt = order.updatedAt ? order.updatedAt.toDate() : new Date(0);
-            if (updatedAt >= today) {
-                order.docId = doc.id; // เก็บ ID ไว้ใช้
-                order.updatedAtDate = updatedAt; // เก็บเวลาไว้ใช้เรียงลำดับ
+            
+            // 🔥 กรองเอาเฉพาะบิลที่เวลาตรงกับ "วันที่เราเลือก" เป๊ะๆ
+            if (updatedAt >= startOfDay && updatedAt <= endOfDay) {
+                order.docId = doc.id; 
+                order.updatedAtDate = updatedAt; 
                 paidOrders.push(order);
             }
         });
 
-        // 🚨 ดักเช็คบิลว่างตรงนี้เรียบร้อยแล้ว (โยกมาจากท่อนล่างของเก่า เพื่อให้โค้ดทำงานโปรขึ้น)
+        // ถ้าวันนั้นไม่มีบิลเลย ให้โชว์ข้อความว่าไม่มีของวันที่เท่าไหร่
         if (paidOrders.length === 0) {
-            container.innerHTML = '<p style="color: #5b7c9e; text-align:center;">ไม่มีรายการชำระเงินในวันนี้</p>';
-            
-            // อัปเดตเลขปุ่มให้เป็น 0 ด้วยถ้าไม่มีบิล
-            const subPaidBadge = document.getElementById('sub-paid-badge');
-            if (subPaidBadge) subPaidBadge.innerText = 0;
+            const showDateStr = startOfDay.toLocaleDateString('th-TH');
+            container.innerHTML = `<p style="color: #5b7c9e; text-align:center;">ไม่มีรายการชำระเงินในวันที่ ${showDateStr}</p>`;
             return;
         }
 
-        // ⏱️ 2. เรียงลำดับเวลาเก่าไปใหม่ เพื่อให้บิลแรกสุดของวันล็อกเลข 1 ไว้ล่างสุด
+        // เรียงลำดับเวลาเก่าไปใหม่ เพื่อให้บิลแรกสุดอยู่ล่างสุด
         paidOrders.sort((a, b) => a.updatedAtDate - b.updatedAtDate);
 
         let html = '';
 
-        // 🎨 3. ลูปดึงข้อมูลย้อนกลับเพื่อดันบิลใหม่ขึ้นบนสุด แต่ลำดับเลข บิล: 1 จะอยู่ด้านล่างสุดตามเวลาจริง
+        // ลูปวาดหน้าตาบิลเหมือนเดิมเป๊ะของมึง
         for (let i = paidOrders.length - 1; i >= 0; i--) {
             const order = paidOrders[i];
-            const displayIndex = i + 1; // 🔢 รันเลขลำดับ บิล: 1, บิล: 2, บิล: 3 ตามลำดับเวลาจริง
+            const displayIndex = i + 1; 
             const detailsId = `paid-details-${order.docId}`; 
             
-            // วนลูปดึงรายการสินค้าด้านในบิล
             let itemsHtml = '';
             if (order.items && Array.isArray(order.items)) {
                 order.items.forEach(item => {
                     const imgUrl = item.img || item.imageUrl || item.image || 'https://cdn-icons-png.flaticon.com/512/1170/1170628.png'; 
-                    
                     itemsHtml += `
                         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee;">
                             <div style="display: flex; align-items: center; gap: 12px;">
@@ -1344,7 +1355,6 @@ async function loadPaidBills() {
             const shippingCost = order.shippingCost || 0;
             const totalPaid = order.productTotal + shippingCost;
 
-            // ประกอบร่างบิลคุมโทนสีเขียวสไตล์หลักฐานการเงิน Layout ใหม่ 2 บรรทัดเป๊ะๆ
             html += `
                 <div class="bill-card" style="margin-bottom: 15px; border: 1px solid #28a745; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                     
@@ -1400,12 +1410,6 @@ async function loadPaidBills() {
             `;
         }
 
-        // 🔥 ท่อนล่างระบบ ID ตัวใหม่ล่าสุด: สั่งอัปเดตตัวเลขวงกลมสีเขียวบนปุ่มหน้าย่อยผ่าน ID ตรงๆ
-        const subPaidBadge = document.getElementById('sub-paid-badge');
-        if (subPaidBadge) {
-            subPaidBadge.innerText = paidOrders.length; 
-        }
-
         container.innerHTML = html;
 
     } catch (error) {
@@ -1446,7 +1450,7 @@ async function updatePaidCountBadgeOnly() {
 
 
 // ==========================================
-// 📌 ฟังก์ชันโหลดข้อมูลบิล "ยกเลิกบิล" (เวอร์ชันปรับโครงสร้างหัวบิล 2 บรรทัดสวยๆ)
+// 📌 ฟังก์ชันโหลดข้อมูลบิล "ยกเลิกบิล" (เวอร์ชันมีปฏิทินเลือกดูย้อนหลังได้)
 // ==========================================
 async function loadCanceledBills() {
     const container = document.getElementById('canceled-bills-container');
@@ -1458,17 +1462,32 @@ async function loadCanceledBills() {
         // วิ่งไปดึงบิลทั้งหมดที่สถานะเป็น "ยกเลิก"
         const snapshot = await db.collection("orders").where("status", "==", "ยกเลิก").get();
         
-        // ล็อกเวลาวันนี้ เริ่มต้นที่เวลา 00:00:00 เพื่อกรอกเฉพาะบิลของวันนี้
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // 📅 จัดการวันที่จากปฏิทิน
+        const datePicker = document.getElementById('canceled-date-picker');
+        let targetDate = new Date();
+
+        if (datePicker && datePicker.value) {
+            // ถ้ามีการเลือกวันที่จากปฏิทิน ให้ใช้วันนั้น
+            targetDate = new Date(datePicker.value);
+        } else if (datePicker) {
+            // เซ็ตค่าเริ่มต้นให้ปฏิทินโชว์ "วันนี้" ตอนเปิดหน้าครั้งแรก
+            const localISOTime = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            datePicker.value = localISOTime;
+        }
+
+        // กำหนดขอบเขตเวลา เริ่มต้น 00:00:00 ถึง 23:59:59 ของวันที่เลือกเท่านั้น
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
 
         let canceledOrders = [];
         snapshot.forEach(doc => {
             const order = doc.data();
             const updatedAt = order.updatedAt ? order.updatedAt.toDate() : new Date(0);
             
-            // กรองเก็บไว้เฉพาะบิลที่มีเวลาการอัปเดตตั้งแต่ช่วง 00:00 ของวันนี้เป็นต้นไป
-            if (updatedAt >= today) {
+            // 🔥 กรองเอาเฉพาะบิลที่เวลาตรงกับ "วันที่เราเลือก" เป๊ะๆ
+            if (updatedAt >= startOfDay && updatedAt <= endOfDay) {
                 order.docId = doc.id;
                 order.updatedAtDate = updatedAt; // เก็บค่าเวลาตัวแท้ไว้ใช้จัดเรียง
                 canceledOrders.push(order);
@@ -1476,7 +1495,8 @@ async function loadCanceledBills() {
         });
 
         if (canceledOrders.length === 0) {
-            container.innerHTML = '<p style="color: #5b7c9e; text-align:center;">ไม่มีรายการบิลที่ถูกยกเลิกในวันนี้</p>';
+            const showDateStr = startOfDay.toLocaleDateString('th-TH');
+            container.innerHTML = `<p style="color: #5b7c9e; text-align:center;">ไม่มีรายการบิลที่ถูกยกเลิกในวันที่ ${showDateStr}</p>`;
             return;
         }
 
@@ -1609,7 +1629,7 @@ async function updateCanceledCountBadgeOnly() {
 
 
 // ==========================================
-// 📌 สเต็ปที่ 2: ฟังก์ชันโหลดข้อมูล "สินค้ารอส่ง" (เวอร์ชันพับบิลไว้ กดถึงกาง)
+// 📌 สเต็ปที่ 2: ฟังก์ชันโหลดข้อมูล "สินค้ารอส่ง" (เวอร์ชันค้างบิลข้ามวันได้ จนกว่าจะกดส่ง)
 // ==========================================
 async function loadPendingShipping() {
     const container = document.getElementById('shipping-pending-container');
@@ -1620,15 +1640,15 @@ async function loadPendingShipping() {
 
     try {
         const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         let pendingShippingOrders = [];
 
         snapshot.forEach(doc => {
             const order = doc.data();
             const updatedAt = order.updatedAt ? (order.updatedAt.toDate ? order.updatedAt.toDate() : new Date(order.updatedAt)) : new Date(0);
             
-            if (updatedAt >= today && !order.shippingStatus) {
+            // 🔥 [จุดที่แก้] เอาเงื่อนไขดักเวลา (today) ออกไปเลย!
+            // สนใจแค่ว่า "ยังไม่ได้กดสถานะจัดส่ง" เท่านั้น บิลจะค้างอยู่ตลอดไปจนกว่าจะเคลียร์
+            if (!order.shippingStatus) {
                 order.docId = doc.id;
                 order.updatedAtDate = updatedAt;
                 pendingShippingOrders.push(order);
@@ -1642,6 +1662,7 @@ async function loadPendingShipping() {
             return;
         }
 
+        // เรียงลำดับบิลตามเวลา (คิวเก่าสุดขึ้นก่อน จะได้รีบแพ็คส่ง)
         pendingShippingOrders.sort((a, b) => a.updatedAtDate - b.updatedAtDate);
 
         let html = '';
@@ -1718,7 +1739,6 @@ async function loadPendingShipping() {
     }
 }
 
-
 // ==========================================
 // 📌 สเต็ปที่ 3: ลอจิกการกดปุ่ม "รับสินค้าเอง" และ "ส่งสินค้าสำเร็จ" (ฝังระบบประวัติแล้ว)
 // ==========================================
@@ -1751,7 +1771,7 @@ async function confirmShippingAction(docId, actionType) {
 }
 
 // ==========================================
-// 📌 สเต็ปที่ 4: โหลดข้อมูล "ประวัติการส่งสินค้า" (เวอร์ชันพับเก็บ กดกางเพื่อแคปจอได้)
+// 📌 สเต็ปที่ 4: โหลดข้อมูล "ประวัติการส่งสินค้า" (เวอร์ชันมีปฏิทินเลือกดูย้อนหลังได้)
 // ==========================================
 async function loadHistoryShipping() {
     const container = document.getElementById('shipping-history-container');
@@ -1761,15 +1781,36 @@ async function loadHistoryShipping() {
 
     try {
         const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        
+        // 📅 จัดการวันที่จากปฏิทิน
+        const datePicker = document.getElementById('shipping-history-date-picker');
+        let targetDate = new Date();
+
+        if (datePicker && datePicker.value) {
+            // ถ้ามีการเลือกวันที่จากปฏิทิน ให้ใช้วันนั้น
+            targetDate = new Date(datePicker.value);
+        } else if (datePicker) {
+            // เซ็ตค่าเริ่มต้นให้ปฏิทินโชว์ "วันนี้" ตอนเปิดหน้าครั้งแรก
+            const localISOTime = new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+            datePicker.value = localISOTime;
+        }
+
+        // กำหนดขอบเขตเวลา เริ่มต้น 00:00:00 ถึง 23:59:59 ของวันที่เลือกเท่านั้น
+        const startOfDay = new Date(targetDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(targetDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
         let historyOrders = [];
 
         snapshot.forEach(doc => {
             const order = doc.data();
             if (order.shippingStatus) {
+                // อิงจากเวลาที่จัดส่งของ (shippedAt) เป็นหลัก
                 const shippedDate = order.shippedAt ? (order.shippedAt.toDate ? order.shippedAt.toDate() : new Date(order.shippedAt)) : new Date(0);
-                if (shippedDate >= today) {
+                
+                // 🔥 กรองเอาเฉพาะบิลที่เวลาจัดส่งตรงกับ "วันที่เราเลือก" เป๊ะๆ
+                if (shippedDate >= startOfDay && shippedDate <= endOfDay) {
                     order.docId = doc.id;
                     order.shippedAtDate = shippedDate;
                     historyOrders.push(order);
@@ -1778,10 +1819,12 @@ async function loadHistoryShipping() {
         });
 
         if (historyOrders.length === 0) {
-            container.innerHTML = '<div style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #6c757d;">ยังไม่มีประวัติการจัดส่งในวันนี้ครับเจ้านาย 📭</div>';
+            const showDateStr = startOfDay.toLocaleDateString('th-TH');
+            container.innerHTML = `<div style="border-radius: 10px; padding: 30px 20px; text-align: center; color: #5b7c9e; border: 2px dashed #6c757d;">ไม่มีประวัติการจัดส่งในวันที่ ${showDateStr} ครับเจ้านาย 📭</div>`;
             return;
         }
 
+        // เรียงลำดับเวลาให้บิลล่าสุดอยู่ด้านบนสุด
         historyOrders.sort((a, b) => b.shippedAtDate - a.shippedAtDate);
 
         let html = '';
@@ -1891,7 +1934,7 @@ window.toggleShippingDetails = function(detailsId) {
 
 
 // ==========================================
-// 📌 ฟังก์ชันนับเลขบิลรอส่ง (อัปเดตทั้งหน้าหลักและหน้าย่อย)
+// 📌 ฟังก์ชันนับเลขบิลรอส่ง (นับรวมบิลค้างเก่าทั้งหมด)
 // ==========================================
 async function updatePendingShippingBadgeOnly() {
     const badgeSub = document.getElementById('shipping-pending-badge');       // เลขในหน้าย่อย (สีส้ม)
@@ -1899,16 +1942,13 @@ async function updatePendingShippingBadgeOnly() {
 
     try {
         const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         
         let count = 0;
         snapshot.forEach(doc => {
             const order = doc.data();
-            const updatedAt = order.updatedAt ? (order.updatedAt.toDate ? order.updatedAt.toDate() : new Date(order.updatedAt)) : new Date(0);
             
-            // นับของวันนี้ที่ยังไม่จัดส่ง
-            if (updatedAt >= today && !order.shippingStatus) {
+            // 🔥 [จุดที่แก้] ไม่ต้องสนวันที่นับรวมหมด ถ้าบิลนี้ยังไม่ได้กดจัดส่ง!
+            if (!order.shippingStatus) {
                 count++;
             }
         });
@@ -1926,6 +1966,7 @@ async function updatePendingShippingBadgeOnly() {
         console.error("❌ Error updating badge:", error);
     }
 }
+
 
 // 🔥 จุดชนวน: สั่งให้นับเลขทันทีที่เปิดเข้าเว็บ (ไม่ต้องรอคลิก)
 window.addEventListener('load', () => {
