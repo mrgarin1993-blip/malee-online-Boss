@@ -48,25 +48,57 @@
             <h1>🔵 Online</h1>
         </div>
 
-       <div class="search-bar">
-            <span>Store</span>
-            <span>🔍</span>
-        </div>
-        <div class="stats-container">
-            <div class="stat-box">
-                Daily Revenue
-                <p>$4.00</p>
-            </div>
-            <div class="stat-box">
-                Weekly Revenue
-                <p>$7.4.00</p>
-            </div>
-            <div class="stat-box">
-                Monthly
-                <p>$$.330</p>
-            </div>
+<!-- แถบค้นหาหน้าหลัก (ปรับใหม่ให้เป็นช่องพิมพ์ข้อความ) -->
+        <div class="search-bar" style="display: flex; align-items: center; background: #fff; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px;">
+            <input type="text" id="main-search-input" placeholder="ค้นหาชื่อลูกค้า, รหัสบิล..." style="flex: 1; border: none; outline: none; font-size: 1em; color: #333;" onkeyup="handleMainSearch(event)">
+            <span style="cursor: pointer; padding-left: 10px; font-size: 1.2em;" onclick="executeMainSearch()">🔍</span>
         </div>
 
+        <!-- กล่องแสดงผลลัพธ์การค้นหา (ซ่อนไว้ตอนแรก จะเด้งขึ้นมาตอนกดค้นหา) -->
+        <div id="search-result-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: flex-start; padding-top: 50px; overflow-y: auto;">
+            <div style="background: #fff; width: 90%; max-width: 500px; border-radius: 12px; padding: 20px; position: relative; margin-bottom: 50px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
+                <span onclick="closeSearchOverlay()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5em; cursor: pointer; color: #dc3545; font-weight: bold;">✕</span>
+                <h3 style="color: #16365d; text-align: center; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">🔍 ผลการค้นหา</h3>
+                <div id="search-result-container" style="margin-top: 15px; max-height: 60vh; overflow-y: auto;">
+                    <!-- ผลลัพธ์จะมาโชว์ที่นี่ -->
+                </div>
+            </div>
+        </div>
+        
+<div class="stats-container" style="display: flex; gap: 15px; margin-bottom: 30px; margin-top: 20px;">
+            
+            <!-- กล่องรายวัน -->
+            <div class="stat-box" style="position: relative; flex: 1; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; cursor: pointer; border-bottom: 4px solid #007bff;" onclick="try{document.getElementById('daily-date').showPicker();}catch(e){}">
+                <!-- ซ่อนปฏิทินให้มองไม่เห็น แต่พอกดกล่องยังเด้งขึ้นมาเหมือนเดิม -->
+                <input type="date" id="daily-date" style="position: absolute; opacity: 0; width: 1px; height: 1px; z-index: -1;" onchange="calculateRevenue('daily')">
+                
+                <h4 style="margin: 0; color: #555; font-size: 1.1em; pointer-events: none;">สรุปยอดรายวัน</h4>
+                <p id="daily-revenue" style="margin: 10px 0 0 0; font-size: 1.8em; font-weight: bold; color: #007bff; pointer-events: none;">฿0.00</p>
+                <small style="color: #999; pointer-events: none;">(เฉพาะค่าสินค้า)</small>
+            </div>
+
+            <!-- กล่องรายสัปดาห์ -->
+            <div class="stat-box" style="position: relative; flex: 1; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; cursor: pointer; border-bottom: 4px solid #28a745;" onclick="try{document.getElementById('weekly-date').showPicker();}catch(e){}">
+                <!-- ซ่อนปฏิทินให้มองไม่เห็น แต่พอกดกล่องยังเด้งขึ้นมาเหมือนเดิม -->
+                <input type="week" id="weekly-date" style="position: absolute; opacity: 0; width: 1px; height: 1px; z-index: -1;" onchange="calculateRevenue('weekly')">
+                
+                <h4 style="margin: 0; color: #555; font-size: 1.1em; pointer-events: none;">สรุปยอดรายสัปดาห์</h4>
+                <p id="weekly-revenue" style="margin: 10px 0 0 0; font-size: 1.8em; font-weight: bold; color: #28a745; pointer-events: none;">฿0.00</p>
+                <small style="color: #999; pointer-events: none;">(เฉพาะค่าสินค้า)</small>
+            </div>
+
+            <!-- กล่องรายเดือน -->
+            <div class="stat-box" style="position: relative; flex: 1; padding: 20px; background: #fff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; cursor: pointer; border-bottom: 4px solid #ffc107;" onclick="try{document.getElementById('monthly-date').showPicker();}catch(e){}">
+                <!-- ซ่อนปฏิทินให้มองไม่เห็น แต่พอกดกล่องยังเด้งขึ้นมาเหมือนเดิม -->
+                <input type="month" id="monthly-date" style="position: absolute; opacity: 0; width: 1px; height: 1px; z-index: -1;" onchange="calculateRevenue('monthly')">
+                
+                <h4 style="margin: 0; color: #555; font-size: 1.1em; pointer-events: none;">สรุปยอดรายเดือน</h4>
+                <p id="monthly-revenue" style="margin: 10px 0 0 0; font-size: 1.8em; font-weight: bold; color: #ffc107; pointer-events: none;">฿0.00</p>
+                <small style="color: #999; pointer-events: none;">(เฉพาะค่าสินค้า)</small>
+            </div>
+
+        </div>
+        
         <div class="menu-wrapper">
             <div class="menu-grid">
                 
