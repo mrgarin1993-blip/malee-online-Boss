@@ -2234,15 +2234,23 @@ async function loadActionLogs() {
     }
 }
 
-// 📌 ฟังก์ชันกดแล้ววาร์ป! (Deep Link) - อัปเกรดประตูวาร์ปครบทุกโซน (สมบูรณ์ 100%)
-function warpToAction(type, targetId) {
+// 📌 ฟังก์ชันกดแล้ววาร์ป! (Deep Link) - อัปเกรดแก้บั๊กปฏิทิน + ซ่อนหน้าหลักสมบูรณ์
+async function warpToAction(type, targetId) {
     if (!targetId || targetId === 'null') {
         alert("รายการนี้ไม่มีเป้าหมายให้วาร์ปไปดูครับ");
         return;
     }
 
-    // ปิดหน้าประวัติก่อนวาร์ป
-    document.getElementById('action-log-page').style.display = 'none';
+    // 🔥 ลอจิกใหม่: ปิดซ่อน "เมนูหน้าหลัก" เสมอ เพื่อป้องกันหน้าจอซ้อนทับกัน
+    const header = document.querySelector('.header'); if(header) header.style.display = 'none';
+    const searchBar = document.querySelector('.search-bar'); if(searchBar) searchBar.style.display = 'none';
+    const stats = document.querySelector('.stats-container'); if(stats) stats.style.display = 'none';
+    const menu = document.querySelector('.menu-wrapper'); if(menu) menu.style.display = 'none';
+    const topHomeBtn = document.getElementById('top-home-btn'); if(topHomeBtn) topHomeBtn.style.display = 'block';
+
+    // ปิดหน้าประวัติก่อนวาร์ป (เผื่อวาร์ปมาจากหน้าประวัติการทำงาน)
+    let actionLogPage = document.getElementById('action-log-page');
+    if (actionLogPage) actionLogPage.style.display = 'none';
 
     // ------------------------------------
     // 1. โซนหมวดหมู่
@@ -2267,7 +2275,7 @@ function warpToAction(type, targetId) {
         }
     } 
     // ------------------------------------
-    // 3. โซนบิลสินค้า
+    // 3. โซนบิลสินค้า (แก้บั๊กปฏิทินหมุนตามวันที่ของบิลอัตโนมัติ!)
     // ------------------------------------
     else if (type === 'bill') {
         let parts = targetId.split('|');
@@ -2276,25 +2284,43 @@ function warpToAction(type, targetId) {
 
         document.getElementById('bills-submenu-page').style.display = 'block';
         
-        setTimeout(() => {
-            if (billStatus === 'ชำระแล้ว') {
-                if (typeof openBillPage === 'function') openBillPage('paid'); 
-                if (typeof loadPaidBills === 'function') loadPaidBills();
-            } else if (billStatus === 'ยกเลิก') {
-                if (typeof openBillPage === 'function') openBillPage('canceled'); 
-                if (typeof loadCanceledBills === 'function') loadCanceledBills();
-            }
-            
-            setTimeout(() => {
-                let targetIdName = billStatus === 'ชำระแล้ว' ? `paid-details-${billId}` : `canceled-details-${billId}`;
-                let targetDetails = document.getElementById(targetIdName);
+        try {
+            // 🔥 วิ่งไปดึงข้อมูลบิลใบนี้จากไฟล์เบส เพื่อขอดู "เวลา (updatedAt)" ของมัน
+            const docRef = await db.collection("orders").doc(billId).get();
+            if(docRef.exists) {
+                const orderData = docRef.data();
+                const orderDate = orderData.updatedAt ? orderData.updatedAt.toDate() : new Date();
+                const localISOTime = new Date(orderDate.getTime() - (orderDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
                 
-                if (targetDetails) {
-                    targetDetails.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    targetDetails.style.display = 'block'; 
+                // แอบหมุนปฏิทินให้ตรงกับวันของบิล ก่อนที่จะสั่งโหลดข้อมูล!
+                if (billStatus === 'ชำระแล้ว') {
+                    let picker = document.getElementById('paid-date-picker');
+                    if(picker) picker.value = localISOTime;
+                    if (typeof openBillPage === 'function') openBillPage('paid'); 
+                    if (typeof loadPaidBills === 'function') await loadPaidBills(); // รอจนโหลดเสร็จ
+                } else if (billStatus === 'ยกเลิก') {
+                    let picker = document.getElementById('canceled-date-picker');
+                    if(picker) picker.value = localISOTime;
+                    if (typeof openBillPage === 'function') openBillPage('canceled'); 
+                    if (typeof loadCanceledBills === 'function') await loadCanceledBills(); // รอจนโหลดเสร็จ
                 }
-            }, 1500); 
-        }, 500); 
+            }
+        } catch(e) {
+            console.log("วาร์ปปฏิทินมีปัญหา:", e);
+        }
+        
+        // พอปฏิทินดึงบิลมาโชว์เสร็จแล้ว ค่อยเลื่อนจอไปหาบิลใบนั้น!
+        setTimeout(() => {
+            let targetIdName = billStatus === 'ชำระแล้ว' ? `paid-details-${billId}` : `canceled-details-${billId}`;
+            let targetDetails = document.getElementById(targetIdName);
+            
+            if (targetDetails) {
+                targetDetails.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetDetails.style.display = 'block'; 
+            } else {
+                alert("บิลนี้อาจถูกลบไปแล้ว หรือระบบดึงข้อมูลไม่ทันครับ");
+            }
+        }, 1500); 
     } 
     // ------------------------------------
     // 4. โซนจัดส่ง
@@ -2320,7 +2346,7 @@ function warpToAction(type, targetId) {
         }, 500);
     } 
     // ------------------------------------
-    // 5. โซนลูกค้า
+    // 5. โซนลูกค้า (แก้บั๊กพิมพ์หาแล้วกดสวิตช์ได้เลย)
     // ------------------------------------
     else if (type === 'customer') {
         let customerName = targetId; 
@@ -2336,14 +2362,14 @@ function warpToAction(type, targetId) {
                 if (searchInput) {
                     searchInput.value = customerName;
                     if (typeof filterCustomers === 'function') {
-                        filterCustomers();
+                        filterCustomers(); // สั่งกรองลูกค้าโชว์เฉพาะคนนี้
                     }
                 }
             }, 800);
         }, 500);
     } 
     // ------------------------------------
-    // 6. โซนความปลอดภัย (ปิดท้ายด้วย else เผื่อกรณีอื่นๆ)
+    // 6. โซนความปลอดภัย
     // ------------------------------------
     else if (type === 'security') {
         document.getElementById('security-page').style.display = 'block';
@@ -2353,6 +2379,7 @@ function warpToAction(type, targetId) {
         document.getElementById('security-page').style.display = 'block'; 
     }
 }
+
 
 // ==========================================
 // 📌 ฟังก์ชันกล้องวงจรปิด (Action Logger) - รอรับคำสั่งเสียบสายตรง
@@ -2375,5 +2402,267 @@ async function logAction(actionTitle, description, type = 'general', targetId = 
 }
 // ==========================================
 // 📌(จบตรงนี้) ฟังก์ชันกล้องวงจรปิด (Action Logger) - รอรับคำสั่งเสียบสายตรง (จบตรงนี้)
+// ==========================================
+
+
+// ==========================================
+// 📌 ระบบค้นหาหน้าหลัก (ค้นลูกค้า & รหัสบิลเฉพาะส่วนท้ายแบบเป๊ะๆ)
+// ==========================================
+
+// 1. ฟังก์ชันดักจับปุ่ม Enter 
+function handleMainSearch(event) {
+    if (event.key === 'Enter') {
+        executeMainSearch();
+    }
+}
+
+// 2. ฟังก์ชันปิดหน้าต่างป๊อปอัป และเคลียร์ข้อความ
+function closeSearchOverlay() {
+    const overlay = document.getElementById('search-result-overlay');
+    if (overlay) overlay.style.display = 'none';
+    const searchInput = document.getElementById('main-search-input');
+    if (searchInput) searchInput.value = ''; 
+}
+
+// 3. ฟังก์ชันค้นหาหลัก (โปรเวอร์ชัน - เป๊ะ 100%)
+async function executeMainSearch() {
+    const searchText = document.getElementById('main-search-input').value.trim().toLowerCase();
+    const container = document.getElementById('search-result-container');
+    const overlay = document.getElementById('search-result-overlay');
+
+    if (searchText === '') {
+        alert('พิมพ์ชื่อลูกค้า หรือ รหัสบิล (เฉพาะชุดท้ายสุดให้ครบ) ก่อนสิเพื่อน!');
+        return;
+    }
+
+    overlay.style.display = 'flex';
+    container.innerHTML = '<p style="text-align: center; color: #5b7c9e; font-weight: bold;">กำลังค้นหาข้อมูล... ⏳</p>';
+
+    try {
+        let html = '';
+        let foundCount = 0;
+
+        // 🎯 ค้นหาลูกค้า
+        const userSnapshot = await db.collection("users").get();
+        let foundUsers = [];
+        userSnapshot.forEach(doc => {
+            const data = doc.data();
+            const name = (data.name || '').toLowerCase();
+            if (name.includes(searchText)) {
+                foundUsers.push({ docId: doc.id, ...data });
+            }
+        });
+
+        if (foundUsers.length > 0) {
+            html += `<h4 style="color: #17a2b8; margin-bottom: 10px; border-bottom: 2px solid #17a2b8; padding-bottom: 5px;">👤 ลูกค้าที่พบ</h4>`;
+            foundUsers.forEach(user => {
+                const isVip = user.vipStatus === true || user.vipStatus === "active";
+                html += `
+                    <div style="background: white; border: 1px solid #ddd; border-left: 5px solid ${isVip ? '#17a2b8' : '#ccc'}; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                            <span style="font-weight: bold; color: #16365d; font-size: 1.1em;">${user.name || 'ไม่ระบุชื่อ'}</span>
+                            <span style="font-size: 0.8em; background: ${isVip ? '#17a2b8' : '#6c757d'}; color: white; padding: 2px 8px; border-radius: 12px;">${isVip ? 'VIP' : 'ปกติ'}</span>
+                        </div>
+                        <div style="font-size: 0.85em; color: #555; margin-bottom: 8px;">📞 ${user.phone || '-'}</div>
+                        <button onclick="warpToAction('customer', '${user.name}'); closeSearchOverlay();" style="background: #e0f7fa; border: 1px solid #0dcaf0; color: #00838f; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.9em;">
+                            🚀 วาร์ปไปตั้งค่าลูกค้าคนนี้
+                        </button>
+                    </div>
+                `;
+            });
+            foundCount += foundUsers.length;
+        }
+
+        // 🎯 ค้นหาบิลแบบโปร
+        const orderSnapshot = await db.collection("orders").get();
+        let foundOrders = [];
+        orderSnapshot.forEach(doc => {
+            const order = doc.data();
+            const fullBillId = (order.billId || doc.id || '');
+            
+            let lastPart = fullBillId;
+            if (fullBillId.includes('-')) {
+                const parts = fullBillId.split('-');
+                lastPart = parts[parts.length - 1]; 
+            }
+            lastPart = lastPart.toLowerCase();
+
+            if (lastPart === searchText) {
+                order.docId = doc.id;
+                foundOrders.push(order);
+            }
+        });
+
+        if (foundOrders.length > 0) {
+            html += `<h4 style="color: #28a745; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #28a745; padding-bottom: 5px;">🧾 บิลที่พบ</h4>`;
+            
+            foundOrders.sort((a, b) => {
+                const dateA = a.updatedAt ? a.updatedAt.toDate() : new Date(0);
+                const dateB = b.updatedAt ? b.updatedAt.toDate() : new Date(0);
+                return dateB - dateA;
+            });
+
+            foundOrders.forEach((order) => {
+                let statusColor = '#ffc107'; 
+                if (order.status === 'ชำระแล้ว') statusColor = '#28a745';
+                else if (order.status === 'ยกเลิก') statusColor = '#dc3545';
+
+                const finalTotal = (order.productTotal || 0) + (order.shippingCost || 0);
+                const orderDate = order.updatedAt ? order.updatedAt.toDate().toLocaleDateString('th-TH') : 'ไม่ระบุ';
+
+                html += `
+                    <div style="background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: bold; color: #16365d; font-size: 1.05em;">คุณ ${order.customerName}</span>
+                            <span style="background: ${statusColor}; color: white; padding: 3px 10px; border-radius: 20px; font-size: 0.8em; font-weight: bold;">${order.status || 'รอชำระเงิน'}</span>
+                        </div>
+                        <div style="color: #666; font-size: 0.85em; margin-bottom: 4px;">รหัสบิล: <strong style="color: #333;">${order.billId || order.docId}</strong></div>
+                        <div style="color: #666; font-size: 0.85em; margin-bottom: 8px;">วันที่อัปเดต: ${orderDate}</div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #ccc; padding-top: 8px;">
+                            <span style="font-size: 0.9em; color: #555;">ยอดรวม:</span>
+                            <span style="font-weight: bold; color: #333; font-size: 1.1em;">฿${finalTotal}</span>
+                        </div>
+                        
+                        <div style="margin-top: 10px; text-align: center;">
+                            <button onclick="warpToAction('bill', '${order.status}|${order.docId}'); closeSearchOverlay();" style="background: #e8f5e9; border: 1px solid #28a745; color: #28a745; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.9em;">
+                                🚀 วาร์ปไปดูบิลนี้
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            foundCount += foundOrders.length;
+        }
+
+        if (foundCount === 0) {
+            container.innerHTML = `<div style="text-align: center; margin-top: 20px;"><h2 style="color: #dc3545; margin-bottom: 5px;">❌</h2><h3 style="color: #dc3545; margin-top: 0;">ค้นหาไม่พบ!</h3><p style="color: #888; font-size: 0.9em;">ไม่พบชื่อลูกค้า หรือ รหัสบิล "${searchText}" (อย่าลืมพิมพ์รหัสบิลชุดท้ายให้ครบนะ)</p></div>`;
+        } else {
+            container.innerHTML = html;
+        }
+
+    } catch (error) {
+        console.error("❌ Error search:", error);
+        container.innerHTML = '<p style="color:red; text-align:center;">เกิดข้อผิดพลาดในการดึงข้อมูล</p>';
+    }
+}
+// ==========================================
+//(จบตรงนี้) 📌 ระบบค้นหาหน้าหลัก (ค้นลูกค้า & รหัสบิลเฉพาะส่วนท้ายแบบเป๊ะๆ) (จบตรงนี้)
+// ==========================================
+
+
+// ==========================================
+// 📌 ระบบสรุปยอดขาย (รายวัน, รายสัปดาห์, รายเดือน) - ไม่รวมค่าส่ง
+// ==========================================
+
+// ฟังก์ชันแปลง Date เป็นปี-สัปดาห์ (YYYY-Wxx) สำหรับช่องรายสัปดาห์
+function getWeekString(d) {
+    const date = new Date(d.getTime());
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// ฟังก์ชันแปลง YYYY-Wxx กลับมาเป็น Date เริ่มต้นและสิ้นสุดสัปดาห์ (จันทร์-อาทิตย์)
+function getWeekRange(weekStr) {
+    const [year, week] = weekStr.split('-W');
+    const simpleDate = new Date(year, 0, 1 + (week - 1) * 7);
+    const dayOfWeek = simpleDate.getDay();
+    const start = new Date(simpleDate);
+    start.setDate(simpleDate.getDate() - dayOfWeek + 1); // วันจันทร์
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6); // วันอาทิตย์
+    end.setHours(23, 59, 59, 999);
+    start.setHours(0, 0, 0, 0);
+    return { start, end };
+}
+
+// 🎯 ฟังก์ชันหลักสำหรับคำนวณยอด
+async function calculateRevenue(type) {
+    const dateInput = document.getElementById(`${type}-date`).value;
+    if (!dateInput) return; // ถ้าไม่ได้เลือกวัน ให้ข้ามไปเลย
+
+    let totalProductRevenue = 0;
+
+    try {
+        // ดึงเฉพาะบิลที่ "ชำระแล้ว"
+        const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            // ข้ามถ้าไม่มีวันที่อัปเดต หรือไม่มีราคาสินค้า
+            if (!data.updatedAt) return; 
+
+            const orderDate = data.updatedAt.toDate();
+            let isMatch = false;
+
+            // ตรวจสอบเงื่อนไขตามประเภท
+            if (type === 'daily') {
+                const selectedDate = new Date(dateInput);
+                if (orderDate.toDateString() === selectedDate.toDateString()) {
+                    isMatch = true;
+                }
+            } else if (type === 'monthly') {
+                const [yyyy, mm] = dateInput.split('-');
+                if (orderDate.getFullYear() == yyyy && (orderDate.getMonth() + 1) == mm) {
+                    isMatch = true;
+                }
+            } else if (type === 'weekly') {
+                const { start, end } = getWeekRange(dateInput);
+                if (orderDate >= start && orderDate <= end) {
+                    isMatch = true;
+                }
+            }
+
+            // ถ้าระยะเวลาตรงเป๊ะ ให้บวก "เฉพาะค่าสินค้า" เท่านั้น! 
+            if (isMatch) {
+                totalProductRevenue += (data.productTotal || 0);
+            }
+        });
+
+        // แสดงผลตัวเลข (แปลงเป็นรูปแบบมีลูกน้ำ)
+        document.getElementById(`${type}-revenue`).innerText = `฿${totalProductRevenue.toLocaleString('th-TH')}`;
+
+    } catch (error) {
+        console.error("❌ Error calculating revenue:", error);
+    }
+}
+
+// 🎯 ฟังก์ชันเซ็ตค่าเริ่มต้นให้ปฏิทินเป็น "วันปัจจุบัน" ตอนโหลดหน้าเว็บ
+function initRevenueStats() {
+    const today = new Date();
+    
+    // ตั้งค่ารายวัน (YYYY-MM-DD)
+    document.getElementById('daily-date').value = today.toISOString().split('T')[0];
+    
+    // ตั้งค่ารายเดือน (YYYY-MM)
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    document.getElementById('monthly-date').value = `${yyyy}-${mm}`;
+    
+    // ตั้งค่ารายสัปดาห์ (YYYY-Wxx)
+    document.getElementById('weekly-date').value = getWeekString(today);
+
+    // สั่งคำนวณยอดปัจจุบันขึ้นมาโชว์ทันที
+    calculateRevenue('daily');
+    calculateRevenue('weekly');
+    calculateRevenue('monthly');
+}
+
+// สั่งให้โหลดค่าเริ่มต้นตอนเปิดหน้าเว็บ และทำระบบอัปเดตแบบ Realtime
+document.addEventListener('DOMContentLoaded', () => {
+    initRevenueStats();
+
+    // 🎯 ดักจับการเปลี่ยนแปลงในฐานข้อมูลตลอดเวลา (Realtime Auto-Refresh)
+    // พอมียอดชำระเงินเข้ามาใหม่ ตัวเลขในกล่องจะอัปเดตเองทันที!
+    db.collection("orders").where("status", "==", "ชำระแล้ว").onSnapshot(() => {
+        calculateRevenue('daily');
+        calculateRevenue('weekly');
+        calculateRevenue('monthly');
+    });
+});
+// ==========================================
+//(จบตรงนี้) 📌 ระบบสรุปยอดขาย (รายวัน, รายสัปดาห์, รายเดือน) - ไม่รวมค่าส่ง (จบตรงนี้)
 // ==========================================
 
