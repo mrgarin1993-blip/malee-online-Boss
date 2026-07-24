@@ -693,7 +693,7 @@ function openCustomerPage(type) {
 }
 
 // ==========================================
-// 📌 ฟังก์ชันบันทึก/แก้ไขสินค้า (ระบบฝากรูป ImgBB สมบูรณ์ 100%)
+// 📌 ฟังก์ชันบันทึก/แก้ไขสินค้า (ระบบฝากรูป Cloudinary สมบูรณ์ 100%)
 // ==========================================
 async function saveProduct(pid, catName) {
     const btn = document.getElementById(`btn-${pid}`);
@@ -721,25 +721,28 @@ async function saveProduct(pid, catName) {
     try {
         let imageUrl = "";
 
-        // 🟢 โซนอัปโหลดรูปขึ้น ImgBB (ของแท้ของมึง)
+        // 🟢 โซนอัปโหลดรูปขึ้น Cloudinary
         if (fileInput) {
             btn.innerText = "กำลังอัปรูปรอแป๊บ...";
             const formData = new FormData();
-            formData.append("image", fileInput);
             
-            const imgBB_API_KEY = "89e3c423f1eecfc187c245ec36ddb5aa"; 
+            // Cloudinary ใช้คำว่า file แทนคำว่า image
+            formData.append("file", fileInput); 
+            // ใส่ชื่อ Preset ที่มึงตั้งไว้เมื่อกี้
+            formData.append("upload_preset", "lovemalee"); 
             
             try {
-                const response = await fetch(`https://api.imgbb.com/1/upload?key=${imgBB_API_KEY}`, {
+                // ยิงไปที่ URL ของ Cloudinary รหัสร้านมึง hxpszdn6
+                const response = await fetch(`https://api.cloudinary.com/v1_1/hxpszdn6/image/upload`, {
                     method: "POST",
                     body: formData
                 });
                 const data = await response.json();
                 
-                if (data.success) {
-                    imageUrl = data.data.url; 
+                if (response.ok) {
+                    imageUrl = data.secure_url; // Cloudinary จะส่งลิงก์รูปกลับมาในชื่อ secure_url
                 } else {
-                    alert("เกิดปัญหาฝากรูป: " + data.error.message);
+                    alert("เกิดปัญหาฝากรูป: " + (data.error ? data.error.message : "ไม่ทราบสาเหตุ"));
                     btn.innerText = "บันทึก";
                     btn.style.background = "#16365d";
                     btn.disabled = false;
@@ -756,12 +759,12 @@ async function saveProduct(pid, catName) {
 
         btn.innerText = "กำลังจัดเก็บข้อมูล...";
 
-        // 🟢 โซนจัดเตรียมข้อมูล (ระบบจะส่ง catName ชื่อใหม่ล่าสุดไปทับของเก่าที่นี่แหละ!)
+        // 🟢 โซนจัดเตรียมข้อมูล (ระบบจะส่ง catName ชื่อใหม่ล่าสุดไปทับของเก่าที่นี่)
         let productData = {
             name: nameInput,
             price: parseFloat(priceInput) || 0,
             vipPrice: parseFloat(wholesaleInput) || 0,
-            category: catName, // <-- ดึงชื่อภาษาไทยจากปุ่มหน้าเว็บมาใช้เลย
+            category: catName, // <-- ดึงชื่อภาษาไทยจากปุ่มหน้าเว็บมาใช้
             isSelling: isSelling,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
@@ -774,7 +777,7 @@ async function saveProduct(pid, catName) {
         // ยิงข้อมูลขึ้น Firebase (merge: true คืออัปเดตเฉพาะค่าที่ส่งไป ค่าอื่นไม่หาย)
         await db.collection("products").doc(pid).set(productData, { merge: true });
 
-        // 🔥 สั่งบันทึกประวัติแบบละเอียด โชว์ข้อมูลที่อัปเดต และมัดรวมรหัสไปเพื่อใช้วาร์ป
+        // 🔥 สั่งบันทึกประวัติแบบละเอียด
         if (typeof logAction === 'function') {
             logAction(
                 'บันทึก/แก้ไขสินค้า', 
@@ -1422,32 +1425,46 @@ async function loadPaidBills() {
 // ==========================================
 // 📌 ตัวนับจำนวนบิล "ชำระแล้ว" เพื่ออัปเดตตัวเลขหน้าย่อยแบบเรียลไทม์
 // ==========================================
+let unsubscribePaidBadge = null; // ตัวแปรนี้ป้องกันการดักฟังซ้ำซ้อน
+
 async function updatePaidCountBadgeOnly() {
     try {
-        const snapshot = await db.collection("orders").where("status", "==", "ชำระแล้ว").get();
-        let todayPaidCount = 0;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        snapshot.forEach(doc => {
-            const order = doc.data();
-            const updatedAt = order.updatedAt ? order.updatedAt.toDate() : new Date(0);
-            if (updatedAt >= today) {
-                todayPaidCount++;
-            }
-        });
-
-// 🔥 วางท่อนนี้ลงไปทับท่อนเก่าท่อนเดียว จบ!
-        const subPaidBadge = document.getElementById('sub-paid-badge');
-        if (subPaidBadge) {
-            subPaidBadge.innerText = todayPaidCount;
+        // ถ้าระบบเคยดักฟังอยู่แล้ว ให้ล้างค่าเก่าทิ้งก่อนเริ่มใหม่
+        if (unsubscribePaidBadge) {
+            unsubscribePaidBadge();
         }
+
+        // 🔥 เปลี่ยนเป็น .onSnapshot() เพื่อดึงข้อมูลตลอดเวลาแบบ Realtime
+        unsubscribePaidBadge = db.collection("orders")
+            .where("status", "==", "ชำระแล้ว")
+            .onSnapshot(snapshot => {
+                let todayPaidCount = 0;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0); // รีเซ็ตเวลาเป็น 00:00:00 ของวันนี้
+
+                snapshot.forEach(doc => {
+                    const order = doc.data();
+                    const updatedAt = order.updatedAt ? order.updatedAt.toDate() : new Date(0);
+                    
+                    // นับเฉพาะบิลของวันนี้
+                    if (updatedAt >= today) {
+                        todayPaidCount++;
+                    }
+                });
+
+                // ยัดตัวเลขลงใน Badge
+                const subPaidBadge = document.getElementById('sub-paid-badge');
+                if (subPaidBadge) {
+                    subPaidBadge.innerText = todayPaidCount;
+                }
+            }, error => {
+                console.error("เกิดข้อผิดพลาดในการดักฟังบิลชำระแล้ว:", error);
+            });
 
     } catch (error) {
         console.error("Error updating paid badge:", error);
     }
 }
-
 
 // ==========================================
 // 📌 ฟังก์ชันโหลดข้อมูลบิล "ยกเลิกบิล" (เวอร์ชันมีปฏิทินเลือกดูย้อนหลังได้)
@@ -2555,13 +2572,13 @@ async function executeMainSearch() {
 // 📌 ระบบสรุปยอดขาย (รายวัน, รายสัปดาห์, รายเดือน) - ไม่รวมค่าส่ง
 // ==========================================
 
-// ฟังก์ชันแปลง Date เป็นปี-สัปดาห์ (YYYY-Wxx) สำหรับช่องรายสัปดาห์
+// ฟังก์ชันแปลง Date เป็นปี-สัปดาห์ (YYYY-Wxx) สำหรับช่องรายสัปดาห์ (แก้ให้ใช้เวลาไทย/Local)
 function getWeekString(d) {
     const date = new Date(d.getTime());
-    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    date.setDate(date.getDate() + 4 - (date.getDay() || 7));
+    const yearStart = new Date(date.getFullYear(), 0, 1);
     const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-    return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+    return `${date.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
 }
 
 // ฟังก์ชันแปลง YYYY-Wxx กลับมาเป็น Date เริ่มต้นและสิ้นสุดสัปดาห์ (จันทร์-อาทิตย์)
@@ -2599,7 +2616,9 @@ async function calculateRevenue(type) {
 
             // ตรวจสอบเงื่อนไขตามประเภท
             if (type === 'daily') {
-                const selectedDate = new Date(dateInput);
+                // แยกปี เดือน วัน ออกมาสร้าง Date ของ Local Time แก้บั๊กเทียบเวลาคลาดเคลื่อน
+                const [y, m, d] = dateInput.split('-');
+                const selectedDate = new Date(y, m - 1, d);
                 if (orderDate.toDateString() === selectedDate.toDateString()) {
                     isMatch = true;
                 }
@@ -2633,8 +2652,9 @@ async function calculateRevenue(type) {
 function initRevenueStats() {
     const today = new Date();
     
-    // ตั้งค่ารายวัน (YYYY-MM-DD)
-    document.getElementById('daily-date').value = today.toISOString().split('T')[0];
+    // ตั้งค่ารายวัน (YYYY-MM-DD) โดยบังคับชดเชยเวลาให้ตรงกับ Local Time เสมอ
+    const localISOTime = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
+    document.getElementById('daily-date').value = localISOTime;
     
     // ตั้งค่ารายเดือน (YYYY-MM)
     const yyyy = today.getFullYear();
@@ -2650,9 +2670,24 @@ function initRevenueStats() {
     calculateRevenue('monthly');
 }
 
+// 🎯 ฟังก์ชันหน่วงเวลาเพื่อสั่งรีเซ็ตระบบอัตโนมัติเป๊ะๆ ตอนเที่ยงคืน (00:00 น.)
+function scheduleMidnightReset() {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // ตั้งเวลาเที่ยงคืนของคืนนี้
+    
+    const msUntilMidnight = midnight.getTime() - now.getTime(); // คำนวณเวลาที่เหลือจนกว่าจะถึงเที่ยงคืน
+    
+    setTimeout(() => {
+        initRevenueStats(); // รีเซ็ตกล่องวัน/สัปดาห์/เดือน ใหม่หมด
+        scheduleMidnightReset(); // ตั้งเวลาดักรอเที่ยงคืนของรอบวันถัดไปใหม่
+    }, msUntilMidnight);
+}
+
 // สั่งให้โหลดค่าเริ่มต้นตอนเปิดหน้าเว็บ และทำระบบอัปเดตแบบ Realtime
 document.addEventListener('DOMContentLoaded', () => {
     initRevenueStats();
+    scheduleMidnightReset(); // เปิดการทำงานของตัวนับถอยหลังรอรีเซ็ตตอนเที่ยงคืน
 
     // 🎯 ดักจับการเปลี่ยนแปลงในฐานข้อมูลตลอดเวลา (Realtime Auto-Refresh)
     // พอมียอดชำระเงินเข้ามาใหม่ ตัวเลขในกล่องจะอัปเดตเองทันที!
@@ -2665,4 +2700,5 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 //(จบตรงนี้) 📌 ระบบสรุปยอดขาย (รายวัน, รายสัปดาห์, รายเดือน) - ไม่รวมค่าส่ง (จบตรงนี้)
 // ==========================================
+
 
